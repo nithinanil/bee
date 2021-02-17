@@ -35,11 +35,6 @@ async fn propagate<B: StorageBackend>(
     let mut children = vec![message_id];
 
     'outer: while let Some(ref message_id) = children.pop() {
-        // Skip messages that are already solid.
-        if tangle.is_solid_message(message_id).await {
-            continue 'outer;
-        }
-
         // TODO Copying parents to avoid double locking, will be refactored.
         if let Some(parents) = tangle.get(&message_id).await.map(|message| message.parents().to_vec()) {
             // If one of the parents is not yet solid, we skip the current message.
@@ -102,7 +97,10 @@ async fn propagate<B: StorageBackend>(
             // Try to propagate as far as possible into the future.
             if let Some(msg_children) = tangle.get_children(&message_id).await {
                 for child in msg_children {
-                    children.push(child);
+                    // Skip messages that are already solid.
+                    if !tangle.is_solid_message(child).await {
+                        children.push(child);
+                    }
                 }
             }
 
